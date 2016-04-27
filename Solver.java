@@ -7,71 +7,61 @@ public class Solver {
 	private static int maxj;
 	private static Block[] blocks;
 	private static Block[] goal;
-	private static HashSet<Block[]> seen;
+	private static HashSet<Configuration> seen;
+	private static BlocksComparator comparator;
+	private static Stack<Move> solution;
 	
 	private static final int UP = 1;
 	private static final int DOWN = -1;
 	private static final int LEFT = 2;
 	private static final int RIGHT = -2;
+	private static final boolean PRINT = false;
 	
 	static class Block implements Comparable<Block> {
 		int id;
 		int i, j; // coords of top left corner
 		int i2, j2; // i2 = i + len; j2 = j + width
-		int len, width;
 		public String toString() {
-			return String.format("%d: (%d,%d at %d,%d -> %d,%d)", id, len, width, i, j, i2, j2);
-			//return String.format("%d: (%d,%d at %d,%d)", id, len, width, i, j);
+			//return String.format("%d: (%d,%d at %d,%d -> %d,%d)", id, len, width, i, j, i2, j2);
+			return String.format("%d: (%d %d %d %d)", id, i, j, i2, j2);
 			//return "" + id;
 		}
 		public Block clone() {
 			Block b = new Block();
-			b.i = i; b.j = j; b.len = len; b.width = width;
+			b.i = i; b.j = j; b.i2 = i2; b.j2 = j2;
 			return b;
 		}
 		public int compareTo(Block b) {
-			return 0;
+			if(i == b.i)
+				if(j == b.j)
+					if(i2 == b.i2)
+						if(j2 == b.j2)
+							return 0;
+						else
+							return j2 - b.j2;
+					else
+						return i2 - b.i2;
+				else
+					return j - b.j;
+			else
+				return i - b.i;
+		}
+		public boolean equals(Block b) {
+			if(i == b.i)
+				if(j == b.j)
+					if(i2 == b.i2)
+						if(j2 == b.j2)
+							return true;
+			return false;
 		}
 	}
 	
 	static class Configuration {
-		Block[][] grid;
+		int hash;
 		Block[] blocks;
 		
 		public Configuration() {
-			grid = new Block[maxi][maxj];
-			for(int x = 0; x < maxi; x++) {
-				for(int y = 0; y < maxj; y++) {
-					if(Solver.grid[x][y] == null) {
-						grid[x][y] = null;
-					} else {
-						grid[x][y] = Solver.grid[x][y].clone();
-					}
-				}
-			}
-			blocks = new Block[Solver.blocks.length];
-			for(int x = 0; x < blocks.length; x++) {
-				blocks[x] = Solver.blocks[x].clone();
-			}
-		}
-		
-		public void show() {
-			for(int x = 0; x < maxi; x++) {
-				for(int y = 0; y < maxj; y++) {
-					//System.out.println(grid[x][y]);
-					//if(1+1==2) continue;
-					if(grid[x][y] == null) {
-						System.out.print(". ");
-					} else {
-						System.out.print(grid[x][y].id + " ");
-					}
-				}
-				System.out.println();
-			}
-			System.out.println();
-		}
-		public int hashCode() {
-			int hash = 0;
+			hash = 0;
 			int k = 1;
 			
 			for(int x = 0; x < maxi; x++) {
@@ -83,19 +73,42 @@ public class Solver {
 					if(k == 0) ++k;
 				}
 			}
+			
+			blocks = new Block[Solver.blocks.length];
+			for(int x = 0; x < blocks.length; x++) {
+				blocks[x] = Solver.blocks[x].clone();
+			}
+		}
+
+		public int hashCode() {
 			return hash;
 		}
 		
-		public boolean equals(Configuration c) {
-			for(Block cBlock : c.blocks) {
-				Block b = grid[cBlock.i][cBlock.j];
-				System.out.println(b + "; " + cBlock);
-				if(b != null && b.i == cBlock.i && b.j == cBlock.j && b.len == cBlock.len && b.width == cBlock.width) {
-					continue;
+		public boolean equals(Object c) {
+			for(int x = 0; x < blocks.length; x++) {
+				if(!blocks[x].equals(((Configuration) c).blocks[x])) {
+					return false;
 				}
-				return false;
 			}
 			return true;
+		}
+	}
+	
+	class BlocksComparator implements Comparator<Block> {
+		public int compare(Block b, Block c) {
+			if(b.i == c.i)
+				if(b.j == c.j)
+					if(b.i2 == c.i2)
+						if(b.j2 == c.j2)
+							return 0;
+						else
+							return b.j2 - c.j2;
+					else
+						return b.i2 - c.i2;
+				else
+					return b.j - c.j;
+			else
+				return b.i - c.i;
 		}
 	}
 	
@@ -123,24 +136,31 @@ public class Solver {
 		public Move clone() {
 			Move m = new Move(); m.block = block; m.direction = direction; return m;
 		}
+		public Move deepClone() {
+			Move m = new Move(); m.block = block.clone(); m.direction = direction; return m;
+		}
 	}
 	
-	private void solve() {
-		try {
-			Thread.sleep(20);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		show();
+	private boolean solve() {
+//		try {
+//			Thread.sleep(20);
+//		} catch (InterruptedException e) {
+//			e.printStackTrace();
+//		}
+
+		Arrays.sort(blocks, comparator);
 		Configuration config = new Configuration();
-		config.show();
-		print(config.hashCode());
-		if(!seen.add(blocks)) {
-			return;
+		
+		//print(blocks);
+		show();
+		
+		if(!seen.add(config)) {
+			return false;
 		}
+
 		if(check()) {
 			print("FOUND!!");
-			System.exit(0);
+			return true;
 		}
 		
 		List<Move> moves = findMoves();
@@ -149,23 +169,19 @@ public class Solver {
 		for(Move m : moves) {
 			makeMove(m);
 			//if(1+1==2)break;
-			solve();
+			if(solve()) {
+				m.direction = -m.direction;
+				solution.push(m.deepClone());
+				makeMove(m);
+				m.direction = -m.direction;
+				solution.push(m.deepClone());
+				return true;
+			}
 			m.direction = -m.direction;
 			makeMove(m);
-			Configuration c2 = new Configuration();
-			print(config.equals(c2));
-			config.blocks[0].i = -1;
-			for(Block b : config.blocks) {
-				print(b);
-			}
-			print();
-			for(Block b : c2.blocks) {
-				print(b);
-			}
-			print("Equals:");
-			print(config.equals(c2));
-			print(c2.equals(config));
 		}
+		
+		return false;
 	}
 	
 	private void makeMove(Move m) {
@@ -293,7 +309,7 @@ public class Solver {
 	private boolean check() {
 		for(Block goalBlock : goal) {
 			Block b = grid[goalBlock.i][goalBlock.j];
-			if(b != null && b.i == goalBlock.i && b.j == goalBlock.j && b.len == goalBlock.len && b.width == goalBlock.width) {
+			if(b != null && b.i == goalBlock.i && b.j == goalBlock.j && b.i2 == goalBlock.i2 && b.j2 == goalBlock.j2) {
 				continue;
 			}
 			return false;
@@ -306,20 +322,20 @@ public class Solver {
 		maxj = init.nextInt();
 		grid = new Block[maxi][maxj];
 		
-		int id = 0;
+		int id = 0, len, width;
 		List<Block> blocksList = new ArrayList<>();
 		while(init.hasNextInt()) {
 			Block b = new Block();
 			b.id = ++id;
-			b.len = init.nextInt();
-			b.width = init.nextInt();
+			len = init.nextInt();
+			width = init.nextInt();
 			b.i = init.nextInt();
 			b.j = init.nextInt();
-			b.i2 = b.i + b.len;
-			b.j2 = b.j + b.width;
+			b.i2 = b.i + len;
+			b.j2 = b.j + width;
 			
-			for(int x = b.i; x < b.i + b.len; x++) {
-				for(int y = b.j; y < b.j + b.width; y++) {
+			for(int x = b.i; x < b.i + len; x++) {
+				for(int y = b.j; y < b.j + width; y++) {
 					grid[x][y] = b;
 				}
 			}
@@ -330,10 +346,12 @@ public class Solver {
 		blocksList.clear();
 		while(goal.hasNextInt()) {
 			Block b = new Block();
-			b.len = goal.nextInt();
-			b.width = goal.nextInt();
+			len = goal.nextInt();
+			width = goal.nextInt();
 			b.i = goal.nextInt();
 			b.j = goal.nextInt();
+			b.i2 = b.i + len;
+			b.j2 = b.j + width;
 			blocksList.add(b);
 		}
 		this.goal = (Block[]) blocksList.toArray(new Block[blocksList.size()]);
@@ -342,37 +360,57 @@ public class Solver {
 	public Solver(Scanner init, Scanner goal) {
 		parse(init, goal);
 		seen = new HashSet<>();
-		solve();
+		comparator = new BlocksComparator();
+		solution = new Stack<Move>();
+		if(solve()) {
+			while(!solution.isEmpty()) {
+				Move m1 = solution.pop();
+				Move m2 = solution.pop();
+				System.out.print(m1.block.i + " " + m1.block.j + " ");
+				System.out.println(m2.block.i + " " + m2.block.j);
+			}
+			System.exit(1);
+		}
+		System.exit(1);
 	}
 
 	public void print(Object ... args) {
-		for(Object arg : args) {
-			System.out.print(arg + "; ");
-		}
-		System.out.println();
-	}
-	
-	public void show() {
-		for(int x = 0; x < maxi; x++) {
-			for(int y = 0; y < maxj; y++) {
-				//System.out.println(grid[x][y]);
-				//if(1+1==2) continue;
-				if(grid[x][y] == null) {
-					System.out.print(". ");
-				} else {
-					System.out.print(grid[x][y].id + " ");
-				}
+		if(PRINT) {
+			for(Object arg : args) {
+				System.out.print(arg + "; ");
 			}
 			System.out.println();
 		}
-		System.out.println();
+	}
+	
+	public void show() {
+		if(PRINT) {
+			for(int x = 0; x < maxi; x++) {
+				for(int y = 0; y < maxj; y++) {
+					//System.out.println(grid[x][y]);
+					//if(1+1==2) continue;
+					if(grid[x][y] == null) {
+						System.out.print(". ");
+					} else {
+						System.out.print(grid[x][y].id + " ");
+					}
+				}
+				System.out.println();
+			}
+			System.out.println();
+		}
 	}
 	
 	public static void main(String args[]) {
 		Scanner init = null, goal = null;
 		try {
-			init = new Scanner(new File("init.txt"));
-			goal = new Scanner(new File("goal.txt"));
+			if(args.length != 2) {
+				init = new Scanner(new File("init.txt"));
+				goal = new Scanner(new File("goal.txt"));
+			} else {
+				init = new Scanner(new File(args[0]));
+				goal = new Scanner(new File(args[1]));
+			}
 		} catch(Exception e) {
 			e.printStackTrace();
 			System.exit(1);
