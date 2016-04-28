@@ -11,11 +11,14 @@ public class Solver {
 	private static BlocksComparator comparator;
 	private static Stack<Move> solution;
 	
+	private static Stack<Move> history;
+	private static Stack<Move> moves;
+	
 	private static final int UP = 1;
 	private static final int DOWN = -1;
 	private static final int LEFT = 2;
 	private static final int RIGHT = -2;
-	private static final boolean PRINT = false;
+	private static final boolean PRINT = true;
 	
 	static class Block implements Comparable<Block> {
 		int id;
@@ -28,7 +31,7 @@ public class Solver {
 		}
 		public Block clone() {
 			Block b = new Block();
-			b.i = i; b.j = j; b.i2 = i2; b.j2 = j2;
+			b.id = id; b.i = i; b.j = j; b.i2 = i2; b.j2 = j2;
 			return b;
 		}
 		public int compareTo(Block b) {
@@ -141,35 +144,50 @@ public class Solver {
 		}
 	}
 	
-	private boolean solve() {
-//		try {
-//			Thread.sleep(20);
-//		} catch (InterruptedException e) {
-//			e.printStackTrace();
-//		}
+	private boolean solve(Move lastMove) {
+		try {
+			Thread.sleep(20);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 
 		Arrays.sort(blocks, comparator);
 		Configuration config = new Configuration();
 		
-		//print(blocks);
+		print("---");
 		show();
 		
 		if(!seen.add(config)) {
+			print("seen");
 			return false;
 		}
+		
 
 		if(check()) {
 			print("FOUND!!");
 			return true;
 		}
 		
-		List<Move> moves = findMoves();
-		print(moves);
+		if(lastMove != null) {
+			history.push(lastMove.deepClone());
+		}
 		
-		for(Move m : moves) {
+		print("History: ", history);
+		
+		List<Move> newMoves = findMoves();
+		print("Classic moves", newMoves);
+		
+		for(Move m : newMoves) {
+			print("Moves", moves);
+			Move nextMove = moves.pop();
+			if(nextMove == null) {
+				print("returning");
+				history.pop();
+			}
+			print("\nPopped", m, nextMove);
 			makeMove(m);
 			//if(1+1==2)break;
-			if(solve()) {
+			if(solve(m)) {
 				m.direction = -m.direction;
 				solution.push(m.deepClone());
 				makeMove(m);
@@ -179,7 +197,18 @@ public class Solver {
 			}
 			m.direction = -m.direction;
 			makeMove(m);
+			print("Returning...");
+			show();
 		}
+		print(moves.pop());
+		
+		history.pop();
+		print("out of moves");
+		
+		show();
+		print(history);
+		print(moves);
+		//throw new RuntimeException(history.toString() + "\n" + moves);
 		
 		return false;
 	}
@@ -235,9 +264,11 @@ public class Solver {
 	}
 
 	private List<Move> findMoves() {
-		List<Move> moves = new ArrayList<>();
+		List<Move> newMoves = new LinkedList<>();
 		Move m = new Move();
 		int x, y;
+		
+		moves.push(null);
 
 		for(Block b : blocks) {
 			m.block = b;
@@ -253,7 +284,9 @@ public class Solver {
 				}
 				if(y == b.j2) {
 					//System.out.println("OK");
-					moves.add(m.clone());
+					newMoves.add(0, m.clone());
+					moves.push(m.clone());
+					//moves.push(m.clone());
 				}
 			}
 
@@ -268,7 +301,8 @@ public class Solver {
 				}
 				if(y == b.j2) {
 					//System.out.println("OK");
-					moves.add(m.clone());
+					newMoves.add(0, m.clone());
+					moves.push(m.clone());
 				}
 			}
 			
@@ -283,7 +317,8 @@ public class Solver {
 				}
 				if(x == b.i2) {
 					//System.out.println("OK");
-					moves.add(m.clone());
+					newMoves.add(0, m.clone());
+					moves.push(m.clone());
 				}
 			}
 			
@@ -299,11 +334,12 @@ public class Solver {
 				}
 				if(x == b.i2) {
 					//System.out.println("OK");
-					moves.add(m.clone());
+					newMoves.add(0, m.clone());
+					moves.push(m.clone());
 				}
 			}
 		}
-		return moves;
+		return newMoves;
 	}
 
 	private boolean check() {
@@ -362,7 +398,12 @@ public class Solver {
 		seen = new HashSet<>();
 		comparator = new BlocksComparator();
 		solution = new Stack<Move>();
-		if(solve()) {
+		history = new Stack<Move>();
+		moves = new Stack<Move>();
+		
+		
+		
+		if(solve(null)) {
 			while(!solution.isEmpty()) {
 				Move m1 = solution.pop();
 				Move m2 = solution.pop();
@@ -376,8 +417,16 @@ public class Solver {
 
 	public void print(Object ... args) {
 		if(PRINT) {
-			for(Object arg : args) {
-				System.out.print(arg + "; ");
+			for(int x = 0; x < args.length; x++) {
+				if(args[x] instanceof Stack) {
+					Stack s = (Stack) args[x];
+					System.out.print(s.size() > 0 ? "{" : "empty");
+					for(int i = s.size()-1; i >= 0; i--) {
+						System.out.print(s.get(i) + (i == 0 ? "}" :", "));
+					}
+				} else {
+					System.out.print(args[x] + (x == args.length - 1 ? "" : "; "));
+				}
 			}
 			System.out.println();
 		}
@@ -403,10 +452,12 @@ public class Solver {
 	
 	public static void main(String args[]) {
 		Scanner init = null, goal = null;
+		String is = "dads+90.txt";
+		String gs = "dads+90.goal.txt";
 		try {
 			if(args.length != 2) {
-				init = new Scanner(new File("init.txt"));
-				goal = new Scanner(new File("goal.txt"));
+				init = new Scanner(new File(is));
+				goal = new Scanner(new File(gs));
 			} else {
 				init = new Scanner(new File(args[0]));
 				goal = new Scanner(new File(args[1]));
