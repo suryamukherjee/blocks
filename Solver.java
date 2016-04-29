@@ -21,9 +21,9 @@ public class Solver {
 	private static final boolean PRINT = false;
 	
 	static class Block implements Comparable<Block> {
-		int id;
-		int i, j; // coords of top left corner
-		int i2, j2; // i2 = i + len; j2 = j + width
+		private int id;
+		private int i, j; // coords of top left corner
+		private int i2, j2; // i2 = i + len; j2 = j + width
 		public String toString() {
 			//return String.format("%d: (%d,%d at %d,%d -> %d,%d)", id, len, width, i, j, i2, j2);
 			return String.format("%d: (%d %d %d %d)", id, i, j, i2, j2);
@@ -59,9 +59,11 @@ public class Solver {
 		}
 	}
 	
+  /* For collecting statistics */
 	private static int eqCount = 0;
 	private static int iter = 0;
 	private static ArrayList<Integer> hashes = new ArrayList<Integer>();
+
 	static class Configuration {
 		int hash;
 		Block[] blocks;
@@ -150,29 +152,26 @@ public class Solver {
 			}
 			return block.toString() + " " + s;
 		}
+    /* Clones without cloning block */
 		public Move clone() {
 			Move m = new Move(); m.block = block; m.direction = direction; return m;
 		}
+
+    /* Clones block as well */
 		public Move deepClone() {
 			Move m = new Move(); m.block = block.clone(); m.direction = direction; return m;
 		}
 	}
 	
 	private boolean solve() {
-		show();
+
+    /* Set up */
 		findMoves();
 		Arrays.sort(blocks, comparator);
 		Configuration config = new Configuration();
 		seen.add(config);
-		print("history", history);
-		print("moves", moves);
-		Configuration c1 = null;
+
 		while(true) {
-//			try {
-//				Thread.sleep(20);
-//			} catch (InterruptedException e) {
-//				e.printStackTrace();
-//			}
 			++iter;
 
 			Move nextMove = moves.pop();
@@ -190,47 +189,29 @@ public class Solver {
 			}
 			makeMove(nextMove);
 
-			print("--------------");
-			print(iter);
-			show();
-
 			Arrays.sort(blocks, comparator);
 			config = new Configuration();
-			if(config.hash == 528) {
-				print("\n\n\n\nn\n\n\n*********************************");
-			}
-			print(config.hash);
-//			if(iter == 1) {
-//				c1 = new Configuration();
-//				print(c1);
-//			} else {
-//				print(config);
-//			}
+
 			if(!seen.add(config)) {
 				nextMove.direction *= -1;
 				makeMove(nextMove);
-				print("seen");
 				continue;
 			}
-			//print(config.equals(c1));
 
 			history.push(nextMove);
 
 			if(check()) {
-				print("FOUND!!");
 				return true;
 			}
 			
-			
 			findMoves();
-			print("history", history);
-			print("moves", moves);
 		}
 	}
 	
 	private void makeMove(Move m) {
 		Block b = m.block;
 		int x, y, xtop, xbot, yleft, yright;
+
 		switch(m.direction) {
 		case UP:
 			xtop = b.i - 1;
@@ -278,6 +259,8 @@ public class Solver {
 		}
 	}
 
+  /* Checks every block and direction and pushes all possible moves onto stack.
+     Also pushes NULL before pushing any moves to indicate end of moves */
 	private void findMoves() {
 		Move m = new Move();
 		int x, y;
@@ -288,7 +271,6 @@ public class Solver {
 			m.block = b;
 			
 			m.direction = UP;
-			//print(m);
 			if(b.i > 0) {
 				x = b.i - 1;
 				for(y = b.j; y < b.j2; y++) {
@@ -297,14 +279,11 @@ public class Solver {
 					}
 				}
 				if(y == b.j2) {
-					//System.out.println("OK");
 					moves.push(m.clone());
-					//moves.push(m.clone());
 				}
 			}
 
 			m.direction = DOWN;
-			//print(m);
 			if(b.i2 < maxi) {
 				x = b.i2;
 				for(y = b.j; y < b.j2; y++) {
@@ -313,13 +292,11 @@ public class Solver {
 					}
 				}
 				if(y == b.j2) {
-					//System.out.println("OK");
 					moves.push(m.clone());
 				}
 			}
 			
 			m.direction = LEFT;
-			//print(m);
 			if(b.j > 0) {
 				y = b.j-1;
 				for(x = b.i; x < b.i2; x++) {
@@ -328,14 +305,12 @@ public class Solver {
 					}
 				}
 				if(x == b.i2) {
-					//System.out.println("OK");
 					moves.push(m.clone());
 				}
 			}
 			
 			
 			m.direction = RIGHT;
-			//print(m);
 			if(b.j2 < maxj) {
 				y = b.j2;
 				for(x = b.i; x < b.i2; x++) {
@@ -344,13 +319,13 @@ public class Solver {
 					}
 				}
 				if(x == b.i2) {
-					//System.out.println("OK");
 					moves.push(m.clone());
 				}
 			}
 		}
 	}
 
+  /* Checks if the current state satisfies the goal conditions */
 	private boolean check() {
 		for(Block goalBlock : goal) {
 			Block b = grid[goalBlock.i][goalBlock.j];
@@ -431,21 +406,9 @@ public class Solver {
 		while(!sol.isEmpty()) {
 			System.out.println(sol.pop());
 		}
-//		for(Configuration c : seen) {
-//			hashes.add(c.hash);
-//		}
-//		hashes.sort(new Comparator<Integer>() {
-//			public int compare(Integer o1, Integer o2) {
-//				return Integer.compare(o1, o2);
-//			}
-//		});
-//		for(Integer i : hashes) {
-//			System.out.println(i);
-//		}
-//		System.out.println("num iterations:" + iter + ", eqCount:" + eqCount);
-//		System.out.println("hash size: " + seen.size());
 	}
 
+  /* For debugging */
 	public void print(Object ... args) {
 		if(PRINT) {
 			for(int x = 0; x < args.length; x++) {
@@ -463,12 +426,11 @@ public class Solver {
 		}
 	}
 	
+  /* For debugging */
 	public void show() {
 		if(PRINT) {
 			for(int x = 0; x < maxi; x++) {
 				for(int y = 0; y < maxj; y++) {
-					//System.out.println(grid[x][y]);
-					//if(1+1==2) continue;
 					if(grid[x][y] == null) {
 						System.out.print(". ");
 					} else {
@@ -483,28 +445,10 @@ public class Solver {
 	
 	public static void main(String args[]) {
 		Scanner init = null, goal = null;
-		String is = null, gs = null;
-
-		int opt = 1;
-		switch(opt) {
-		case 0:
-			is = "init.txt";
-			gs = "goal.txt";
-			break;
-		case 1:
-			is = "dads+90.txt";
-			gs = "dads+90.goal.txt";
-			break;
-		}
 
 		try {
-			if(args.length != 2) {
-				init = new Scanner(new File(is));
-				goal = new Scanner(new File(gs));
-			} else {
-				init = new Scanner(new File(args[0]));
-				goal = new Scanner(new File(args[1]));
-			}
+			init = new Scanner(new File(args[0]));
+			goal = new Scanner(new File(args[1]));
 		} catch(Exception e) {
 			e.printStackTrace();
 			System.exit(1);
