@@ -66,8 +66,11 @@ public class Solver {
 
 	static class Configuration {
 		int hash;
+    /* Must be sorted */
 		Block[] blocks;
 		
+    /* Constructs a new Configuration. Precondition: Solver.blocks
+       should be sorted! */
 		public Configuration() {
 			hash = 0;
 			int k = 1;
@@ -97,6 +100,8 @@ public class Solver {
 		
 		public boolean equals(Object c) {
 			++eqCount;
+      /* Compares block by block. This works because blocks
+         are sorted */
 			for(int x = 0; x < blocks.length; x++) {
 				if(!blocks[x].equals(((Configuration) c).blocks[x])) {
 					return false;
@@ -176,13 +181,13 @@ public class Solver {
 
 			Move nextMove = moves.pop();
 			if(nextMove == null) {
-				print("Out of moves");
 				Move moveToUndo;
 				try {
 					moveToUndo = history.pop();
 				} catch (EmptyStackException e) {
 					return false;
 				}
+        /* Reverse the move */
 				moveToUndo.direction *= -1;
 				makeMove(moveToUndo);
 				continue;
